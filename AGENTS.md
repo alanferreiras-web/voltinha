@@ -7,7 +7,7 @@ Manter um pipeline semanal para transformar e-mails das labels `trendices` e
 na plataforma.
 
 O fluxo substitui o antigo envio de JSON por e-mail. A planilha passa a ser a
-base de controle operacional antes do envio ao Supabase.
+base de controle operacional e a fonte canônica da plataforma.
 
 ## Fluxo Atual
 
@@ -19,7 +19,6 @@ Gmail labels
   -> Exportador/Validador
   -> Google Sheets: Exports JSON
   -> Apps Script
-  -> Supabase
   -> Plataforma/Front
 ```
 
@@ -39,6 +38,43 @@ Abas:
 - `Evidências`: registros extraídos do Gmail antes da análise editorial.
 - `Exports JSON`: payload final para o Apps Script.
 - `Listas`: valores permitidos para validação.
+- `Controle Semanal`: checkpoint operacional da automação recorrente.
+
+### Aba Controle Semanal
+
+Campos:
+
+```text
+week_start
+week_end
+curador_status
+analista_status
+exportador_status
+apps_script_status
+next_step
+last_update
+notes
+```
+
+Valores operacionais usados em `next_step`:
+
+```text
+acionar_curador
+aguardando_curador
+acionar_analista
+aguardando_analista
+acionar_exportador
+aguardando_exportador
+aguardando_apps_script
+concluido
+concluido_sem_export
+revisar_exportador
+revisar_apps_script
+```
+
+Esta aba evita que a automação precise ficar esperando um especialista terminar
+no mesmo heartbeat. Cada execução lê o estado atual e continua a próxima etapa
+pendente.
 
 ### Aba Evidências
 
@@ -121,19 +157,22 @@ threads em uma pasta visual. A organização do projeto é feita por:
 - backlog em `BACKLOG.md`;
 - artefatos em `outputs/`.
 
-### Coordenador Semanal
+### Orquestrador Por Estado
 
-Tipo: automação semanal no Codex.
+Tipo: automação recorrente no Codex.
 
-Agenda: segunda-feira de manhã.
+Agenda: a cada 30 minutos.
 
 Responsabilidade:
 
-- Acionar os especialistas em sequência.
+- Criar ou encontrar a linha da semana anterior completa em `Controle Semanal`.
+- Acionar os especialistas em sequência, usando `next_step` como checkpoint.
 - Não fazer curadoria, análise ou exportação por conta própria.
-- Só passar para a próxima etapa quando o especialista anterior declarar a
-  saída como concluída.
-- Produzir um resumo final da execução.
+- Não reiniciar etapas marcadas como concluídas ou em andamento.
+- Só passar para a próxima etapa quando o especialista anterior declarar a saída
+  como concluída.
+- Produzir um resumo final quando a edição chegar a `concluido`,
+  `concluido_sem_export`, `revisar_exportador` ou `revisar_apps_script`.
 
 ### Curador de Evidências
 
@@ -290,6 +329,7 @@ Campos principais:
 ```text
 theme
 theme_key
+macro_themes
 title
 synthesis
 evidence_excerpt
@@ -302,6 +342,30 @@ brazil_evidence
 brazil_hypothesis
 brazil_fit
 relevant_links
+```
+
+`macro_themes` é opcional e alimenta apenas a Temperatura do Mês no front.
+Regras:
+
+- Deve ser uma lista.
+- Pode ter 0, 1 ou 2 macrotemas por signal.
+- Não force encaixe quando o signal não couber bem.
+- Se vários signals ficarem sem macrotema pelo mesmo motivo, isso é pista de
+  um novo macrotema emergente para discussão posterior.
+
+Macrotemas iniciais:
+
+```text
+IA
+Novas mídias
+Creator economy
+Cultura jovem
+Consumo e varejo
+Marcas e comunidade
+Trabalho e organizações
+Cidades e território
+Tecnologia e plataformas
+Brasil / identidade cultural
 ```
 
 `brazil_fit` permitido:
@@ -349,9 +413,10 @@ processTrendicesExports
 Responsabilidade:
 
 - Ler linhas com status `Pronto` na aba `Exports JSON`.
-- Enviar o JSON ao endpoint Supabase.
-- Marcar como `Processado` em sucesso.
-- Marcar como `Erro` em falha.
+- Validar o JSON técnico.
+- Marcar como `Processado` quando o payload estiver válido para o front.
+- Marcar como `Erro` quando houver falha de validação.
+- Servir edições `Pronto` e `Processado` via Web App JSON para a plataforma.
 
 Importante:
 
@@ -359,21 +424,20 @@ O Apps Script deve validar `payload.edition.edition_number`,
 `payload.edition.week_start` e `payload.edition.week_end`, não campos soltos no
 topo do JSON.
 
-## Supabase E Front
+## Fonte Do Front
 
-Tabelas usadas pelo front:
+Fonte principal usada pelo front:
 
 ```text
-weekly_editions
-signals
-library_items
-sources
+Apps Script Web App -> aba Exports JSON
 ```
 
-O front lê edições com:
+O Supabase fica legado/opcional para este projeto pessoal. A plataforma deve
+ler edições publicáveis diretamente dos payloads exportados na planilha:
 
 ```text
-status = published
+status = Pronto
+status = Processado
 ```
 
 ## Checklist Semanal
@@ -385,7 +449,7 @@ status = published
 5. Analista declara signals rastreáveis ou encerra sem export.
 6. Coordenador aciona Exportador.
 7. Exportador grava linha `Pronto`.
-8. Apps Script processa linha `Pronto`.
+8. Apps Script valida linha `Pronto` e disponibiliza o JSON.
 9. Plataforma é atualizada.
 10. Resultado visual é conferido no site.
 

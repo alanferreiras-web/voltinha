@@ -425,6 +425,12 @@ header h1{font-size:clamp(62px,7.2vw,112px);line-height:.79;max-width:700px}
 @media(max-width:900px){.report-source-row{grid-template-columns:28px 1fr}.report-source-name,.report-source-title,.report-source-row a{grid-column:2}.report-source-row a{justify-self:start}}
 </style>
 
+<style>
+.like-btn.liked{background:var(--accent);border-color:var(--accent);color:#fffaf0}
+.refresh-status{font-size:11px;color:var(--muted);line-height:1.2}
+@media(max-width:640px){.refresh-status{width:100%}}
+</style>
+
 </head>
 <body>
   <div class="page">
@@ -628,28 +634,63 @@ header h1{font-size:clamp(62px,7.2vw,112px);line-height:.79;max-width:700px}
   
 
 <script>
-const SUPABASE_URL="https://eoobucntinynmjvvfalw.supabase.co", KEY_STORAGE="trendices_publishable_key";
-let key=localStorage.getItem(KEY_STORAGE)||"", editions=[], index=0, allSignals=[], allLibrary=[];
+const API_URL_STORAGE="trendices_apps_script_api_url";
+const LIKE_STORAGE="trendices_editorial_likes";
+let apiUrl=localStorage.getItem(API_URL_STORAGE)||"", editions=[], index=0, allSignals=[], allLibrary=[];
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const dateBR=d=>d?new Date(d+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short",year:"numeric"}).replace(".",""):"";
 const colors=["var(--pink)","var(--purple)","var(--blue)","var(--green)","var(--yellow)"];
-function headers(){return{apikey:key,Authorization:"Bearer "+key,"Content-Type":"application/json"}}
-async function api(path){const r=await fetch(SUPABASE_URL+"/rest/v1/"+path,{headers:headers()});if(!r.ok)throw Error("Supabase respondeu "+r.status);return r.json()}
-function askKey(){const v=prompt("Cole a Publishable key do Supabase (começa com sb_publishable_):",key||"");if(!v)return false;key=v.trim();localStorage.setItem(KEY_STORAGE,key);return true}
+function askApiUrl(){const v=prompt("Cole a URL do Web App do Apps Script:",apiUrl||"");if(!v)return false;apiUrl=v.trim();localStorage.setItem(API_URL_STORAGE,apiUrl);return true}
+async function fetchTrendicesData(){const r=await fetch(apiUrl,{cache:"no-store"});if(!r.ok)throw Error("Apps Script respondeu "+r.status);return r.json()}
+function normalizePayloads(data){
+ const entries=Array.isArray(data)?data:(data.editions||[]);
+ const sourceByName=new Map(), rawEditions=[], signals=[], library=[];
+ entries.forEach((entry,i)=>{
+  const payload=entry.payload||entry, edition=payload.edition||{};
+  const editionId=String(edition.edition_number||entry.edition_number||i+1);
+  rawEditions.push({...edition,id:editionId});
+  (payload.sources||[]).forEach(source=>sourceByName.set(source.name,source));
+  (payload.signals||[]).forEach(signal=>signals.push({...signal,edition_id:editionId,sources:sourceByName.get(signal.source_name)||{name:signal.source_name,source_type:signal.source_type}}));
+  (payload.library_items||[]).forEach(item=>library.push({...item,edition_id:editionId,sources:sourceByName.get(item.source_name)||{name:item.source_name}}));
+ });
+ return {rawEditions,signals,library};
+}
 document.querySelectorAll("button[data-view]").forEach(tab=>tab.addEventListener("click",()=>{document.querySelectorAll("button[data-view]").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));tab.classList.add("active");$("#"+tab.dataset.view).classList.add("active");if(tab.dataset.view==="voltinha"){$("#voltinhaStage").classList.remove("hidden");$("#evolutionStage").classList.remove("active");tab.textContent="Edição da semana";}}));
 function editionSignals(e){return allSignals.filter(s=>s.edition_id===e.id)}
 function sourceLink(s){const title=encodeURIComponent('"'+(s.title||"")+'"');return s.source_url||s.url||`https://mail.google.com/mail/u/0/#search/${title}`}
+function readLikes(){try{return JSON.parse(localStorage.getItem(LIKE_STORAGE)||"{}")}catch(e){return {}}}
+function writeLikes(likes){localStorage.setItem(LIKE_STORAGE,JSON.stringify(likes))}
+function likeKey(it){return it?.id||`edition_${it?.edition_number||index}`}
+function updateLikeButton(){
+ const btn=$("#likeEdition"); if(!btn)return;
+ const it=editions[index], likes=readLikes(), liked=Boolean(it&&likes[likeKey(it)]);
+ btn.classList.toggle("liked",liked);
+ btn.setAttribute("aria-pressed",liked?"true":"false");
+ btn.textContent=liked?"Gostei salvo":"Gostei";
+ btn.title=liked?"Remover este sinal editorial":"Marcar esta edição como assunto para aprofundar";
+}
+function toggleEditionLike(){
+ const it=editions[index]; if(!it)return;
+ const likes=readLikes(), keyId=likeKey(it);
+ if(likes[keyId]) delete likes[keyId];
+ else likes[keyId]={edition_number:it.edition_number,week_start:it.week_start,week_end:it.week_end,summary:it.summary||"",themes:(it.themes||[]).map(([name])=>name),liked_at:new Date().toISOString()};
+ writeLikes(likes);
+ updateLikeButton();
+}
 
-function macroTheme(signal){
-  const raw=(signal.macro_theme||signal.theme_key||signal.theme||"").toLowerCase();
-  if(raw.includes("copa")||raw.includes("fandom")||raw.includes("torcida"))return "Copa do Mundo";
-  if(raw.includes("ia")||raw.includes("agent")||raw.includes("autonomia")||raw.includes("repertorio"))return "IA";
-  if(raw.includes("consumo")||raw.includes("compra")||raw.includes("bem_estar"))return "Novas formas de consumo";
-  if(raw.includes("mídia")||raw.includes("midia")||raw.includes("creator")||raw.includes("distribui"))return "Novas mídias";
-  if(raw.includes("marca")||raw.includes("publicidade")||raw.includes("comunidade"))return "Marca e comunidade";
-  if(raw.includes("cidade")||raw.includes("mobilidade")||raw.includes("territ"))return "Cidades e território";
-  return signal.theme||"Outras conversas";
+function macroThemes(signal){
+  const explicit=Array.isArray(signal.macro_themes)?signal.macro_themes:(signal.macro_theme?[signal.macro_theme]:[]);
+  const clean=explicit.map(x=>String(x||"").trim()).filter(Boolean).slice(0,2);
+  if(clean.length)return clean;
+  const raw=(signal.theme_key||signal.theme||"").toLowerCase();
+  if(raw.includes("copa")||raw.includes("fandom")||raw.includes("torcida"))return ["Copa do Mundo"];
+  if(raw.includes("ia")||raw.includes("agent")||raw.includes("autonomia")||raw.includes("repertorio"))return ["IA"];
+  if(raw.includes("consumo")||raw.includes("compra")||raw.includes("bem_estar"))return ["Novas formas de consumo"];
+  if(raw.includes("mídia")||raw.includes("midia")||raw.includes("creator")||raw.includes("distribui"))return ["Novas mídias"];
+  if(raw.includes("marca")||raw.includes("publicidade")||raw.includes("comunidade"))return ["Marca e comunidade"];
+  if(raw.includes("cidade")||raw.includes("mobilidade")||raw.includes("territ"))return ["Cidades e território"];
+  return [];
 }
 function humanTranslation(text){
   const translations={
@@ -662,10 +703,12 @@ function humanTranslation(text){
 }
 
 function buildEdition(raw){
- const signals=editionSignals(raw), themeMap={}; signals.forEach(s=>{const t=macroTheme(s);(themeMap[t]??=[]).push(s)});
- const themes=Object.entries(themeMap).sort((a,b)=>b[1].length-a[1].length);
+ const signals=editionSignals(raw), themeMap={}; signals.forEach(s=>macroThemes(s).forEach(t=>(themeMap[t]??=[]).push(s)));
+ const themes=Object.entries(themeMap).filter(([,items])=>items.length>=2).sort((a,b)=>b[1].length-a[1].length);
+ const emergingCount=signals.filter(s=>macroThemes(s).length===0).length;
  const sourceNames=[...new Set(signals.map(s=>s.sources?.name||s.source_name).filter(Boolean))];
  return {...raw,date:`${dateBR(raw.week_start)}–${dateBR(raw.week_end)}`,signals,sourceNames,themes,
+  emergingCount,
   topics:(Array.isArray(raw.content?.topics)&&raw.content.topics.length?raw.content.topics:themes.map(x=>x[0])).map((x,i)=>[colors[i%colors.length],x]),
   bullets:signals.length?signals.slice(0,4).map(s=>s.synthesis||s.title):["Esta edição ainda não tem sinais cadastrados."]};
 }
@@ -770,7 +813,7 @@ function renderEdition(){
  $("#topicPills").innerHTML=it.topics.map(([c,t])=>`<span class="pill"><i class="dot" style="background:${c}"></i>${esc(t)}</span>`).join("");
  $("#summaryBullets").innerHTML=it.bullets.map(t=>`<div class="bullet">${esc(t)}</div>`).join("");
  const max=Math.max(...it.themes.map(x=>x[1].length),1);
- $("#temperatureRows").innerHTML=it.themes.length?it.themes.map(([name,items],i)=>{const grouped=groupThemeSources(items); const sourceCount=grouped.length; const signalCount=items.length; return `<div class="theme-reading ${i===0?"open":""}"><button class="theme-head" aria-expanded="${i===0}"><span class="theme-name">${esc(name)}</span><span class="theme-bar"><span style="width:${Math.max(28,items.length/max*92)}%"></span></span><span class="theme-count"><strong>${sourceCount}</strong> ${sourceCount===1?"fonte":"fontes"}${signalCount!==sourceCount?` · ${signalCount} ${signalCount===1?"sinal":"sinais"}`:""}</span><span class="theme-chevron">${i===0?"⌃":"⌄"}</span></button><div class="evidence-list">${grouped.map(evidenceGroupHTML).join("")}</div></div>`}).join(""):`<p style="color:var(--muted)">Ainda não há sinais classificados nesta edição.</p>`;
+ $("#temperatureRows").innerHTML=it.themes.length?it.themes.map(([name,items],i)=>{const grouped=groupThemeSources(items); const signalCount=items.length; return `<div class="theme-reading ${i===0?"open":""}"><button class="theme-head" aria-expanded="${i===0}"><span class="theme-name">${esc(name)}</span><span class="theme-bar"><span style="width:${Math.max(28,items.length/max*92)}%"></span></span><span class="theme-count"><strong>${signalCount}</strong> ${signalCount===1?"sinal":"sinais"}</span><span class="theme-chevron">${i===0?"⌃":"⌄"}</span></button><div class="evidence-list">${grouped.map(evidenceGroupHTML).join("")}</div></div>`}).join(""):`<p style="color:var(--muted)">Ainda não há macrotemas recorrentes nesta edição.</p>`;
  $("#temperatureRows").querySelectorAll(".theme-head").forEach(btn=>btn.addEventListener("click",()=>{const row=btn.closest(".theme-reading"), open=!row.classList.contains("open"); row.classList.toggle("open",open);btn.setAttribute("aria-expanded",open);btn.querySelector(".theme-chevron").textContent=open?"⌃":"⌄"}));
  const visibleSources=[...new Set(it.signals.map(s=>s.sources?.name||s.source_name).filter(Boolean))];
  $("#sourcePills").innerHTML=visibleSources.length
@@ -782,7 +825,7 @@ function renderEdition(){
  const materials=allLibrary.filter(x=>x.status==="to_read"||x.item_type).slice(0,4);
  $("#materialsList").innerHTML=materials.length?materials.map((m,i)=>`<div class="reading-line"><div class="icon-box">${i+1}</div><div><h3>${esc(m.title)}</h3><p>${esc((m.sources?.name||m.source_name||"Material")+(m.description?" · "+m.description:""))}</p>${humanTranslation(m.title)?`<span class="translation">${esc(humanTranslation(m.title))}</span>`:""}<a href="${esc(m.url||sourceLink(m))}" target="_blank" rel="noopener">${m.url?"Ler material ↗":"Buscar no Gmail ↗"}</a></div></div>`).join(""):"<p style='color:var(--muted)'>Os materiais que pedem tempo entram aqui.</p>";
  renderEditorialFollowup(it);
- renderEvolution(); document.querySelectorAll(".edition-card").forEach(c=>c.classList.toggle("selected",c.dataset.id===it.id));
+ renderEvolution(); document.querySelectorAll(".edition-card").forEach(c=>c.classList.toggle("selected",c.dataset.id===it.id)); updateLikeButton();
 }
 function renderEvolution(){const all={}; editions.forEach((ed,n)=>ed.themes.forEach(([t,arr])=>{(all[t]??=Array(editions.length).fill(false))[n]=arr.length>0}));$("#evolutionRows").innerHTML=Object.entries(all).slice(0,6).map(([t,weeks])=>`<div class="timeline-row"><div class="timeline-name">${esc(t)}</div><div class="week-track">${weeks.map(x=>`<span class="week-dot ${x?"active":""}"></span>`).join("")}</div><div class="timeline-count"><strong>${weeks.filter(Boolean).length}</strong> semanas</div></div>`).join("")}
 $("#prevEdition").addEventListener("click",()=>{if(editions.length){index=(index+1)%editions.length;renderEdition()}});
@@ -793,9 +836,32 @@ function renderDrawer(){drawer.innerHTML=`<div class="drawer-backdrop"></div><as
 $("#openHistory").onclick=()=>{renderDrawer();drawer.classList.add("open")};
 $("#showEvolution").onclick=()=>{$("#voltinhaStage").classList.add("hidden");$("#evolutionStage").classList.add("active");document.querySelector('button[data-view="voltinha"]').classList.add("active")};
 
-async function load(){if(!key&&!askKey())return;try{const raw=await api("weekly_editions?status=eq.published&select=*&order=edition_number.desc,created_at.desc");allSignals=await api("signals?select=*,sources(name,source_type)&order=relevance.desc,created_at.asc");allLibrary=await api("library_items?select=*,sources(name)&order=created_at.desc");editions=raw.map(buildEdition);index=0;renderEdition()}catch(e){console.error(e);$("#summaryLead").textContent="A base não respondeu. Confira a Publishable key para carregar as edições."}}
-const refresh=document.createElement("button");refresh.className="ghost-btn";refresh.textContent="Atualizar dados";refresh.onclick=load;document.querySelector(".voltinha-actions").appendChild(refresh);
-const keyButton=document.createElement("button");keyButton.className="ghost-btn";keyButton.textContent="Trocar chave";keyButton.onclick=()=>{localStorage.removeItem(KEY_STORAGE);key="";load()};document.querySelector(".voltinha-actions").appendChild(keyButton);
+async function load(){
+ if(!apiUrl&&!askApiUrl())return;
+ const previousId=editions[index]?.id;
+ const refresh=$("#refreshData"), status=$("#refreshStatus");
+ if(refresh){refresh.disabled=true;refresh.textContent="Atualizando..."}
+ if(status)status.textContent="Buscando dados na planilha";
+ try{
+  const normalized=normalizePayloads(await fetchTrendicesData());
+  allSignals=normalized.signals;
+  allLibrary=normalized.library;
+  editions=normalized.rawEditions.sort((a,b)=>(b.edition_number||0)-(a.edition_number||0)).map(buildEdition);
+  const preservedIndex=editions.findIndex(it=>it.id===previousId);
+  index=preservedIndex>=0?preservedIndex:0;
+  renderEdition();
+  if(status)status.textContent=`Atualizado ${new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}`;
+ }catch(e){
+  console.error(e);$("#summaryLead").textContent="A base não respondeu. Confira a URL do Web App do Apps Script.";
+  if(status)status.textContent="Falha ao atualizar";
+ }finally{
+  if(refresh){refresh.disabled=false;refresh.textContent="Atualizar teste"}
+ }
+}
+const likeButton=document.createElement("button");likeButton.className="ghost-btn like-btn";likeButton.id="likeEdition";likeButton.type="button";likeButton.setAttribute("aria-pressed","false");likeButton.textContent="Gostei";likeButton.onclick=toggleEditionLike;document.querySelector(".voltinha-actions").appendChild(likeButton);
+const refresh=document.createElement("button");refresh.className="ghost-btn";refresh.id="refreshData";refresh.type="button";refresh.textContent="Atualizar teste";refresh.title="Recarregar dados publicados sem rodar o pipeline";refresh.onclick=load;document.querySelector(".voltinha-actions").appendChild(refresh);
+const refreshStatus=document.createElement("span");refreshStatus.className="refresh-status";refreshStatus.id="refreshStatus";refreshStatus.textContent="";document.querySelector(".voltinha-actions").appendChild(refreshStatus);
+const keyButton=document.createElement("button");keyButton.className="ghost-btn";keyButton.textContent="Trocar fonte";keyButton.onclick=()=>{localStorage.removeItem(API_URL_STORAGE);apiUrl="";load()};document.querySelector(".voltinha-actions").appendChild(keyButton);
 function returnToEdition(){ $("#voltinhaStage").classList.remove("hidden"); $("#evolutionStage").classList.remove("active"); const tab=document.querySelector('button[data-view="voltinha"]'); if(tab){tab.classList.add("active");tab.textContent="Edição da semana";} }
 const editionHome=$("#editionHome"),goToEdition=$("#goToEdition");
 if(editionHome)editionHome.onclick=returnToEdition;if(goToEdition)goToEdition.onclick=returnToEdition;
