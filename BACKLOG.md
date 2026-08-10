@@ -6,6 +6,10 @@ Itens neste backlog representam possibilidades, não autorização para executar
 Antes de qualquer programação, cada item deve ser diagnosticado, debatido e
 aprovado explicitamente pelo usuário.
 
+Todos os próximos passos abaixo existem somente para orientar conversas futuras.
+Nenhum item deve ser executado, programado, configurado ou publicado sem uma
+nova aprovação prévia, explícita e inequívoca.
+
 ## Próxima Versão Possível: v2.2
 
 - [ ] Avaliar proteção de escrita para o Web App de tendências citadas.
@@ -47,6 +51,13 @@ aprovado explicitamente pelo usuário.
 
 ## Pipeline
 
+- [x] Criar uma única tarefa cloud semanal para executar Analista Editorial e
+      geração do JSON às segundas-feiras, 12h30, sem depender do computador.
+- [ ] Observar as duas primeiras execuções da tarefa cloud antes de considerá-la
+      estável.
+- [ ] Confirmar que a tarefa cloud acessa a planilha correta pelo conector do
+      Google Drive e nunca duplica uma semana já exportada.
+- [ ] Confirmar o fuso horário efetivo da agenda cloud.
 - [x] Atualizar contrato operacional: `Exports JSON` passa a ser a fonte
       canônica para o front; Supabase fica legado/opcional.
 - [ ] Atualizar o Coordenador Semanal com aprendizados do primeiro teste.
@@ -66,6 +77,14 @@ aprovado explicitamente pelo usuário.
 
 ## Operação
 
+- [ ] Confirmar o acionador de `executarPipelineCompleto` no Apps Script do
+      Curador e a conta Google que o criou.
+- [ ] Confirmar o acionador de `processTrendicesExports` e sua janela semanal.
+- [ ] Revisar o horário da tradução somente depois de observar um ciclo completo
+      com a nova edição cloud.
+- [ ] Discutir um push para o Terrário quando a Voltinha semanal estiver pronta,
+      definindo destino, formato, autenticação, conteúdo e tratamento de falhas
+      antes de qualquer implementação.
 - [ ] Criar um registro de incidentes por semana com período, sintoma, etapa
       provável, correção aplicada e prevenção para a próxima rodada.
 - [ ] Conferir se a automação semanal roda na próxima segunda.

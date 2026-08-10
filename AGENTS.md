@@ -177,22 +177,68 @@ threads em uma pasta visual. A organização do projeto é feita por:
 - backlog em `BACKLOG.md`;
 - artefatos em `outputs/`.
 
-### Orquestrador Por Estado
+### Operação Semanal Atual
 
-Tipo: automação recorrente no Codex.
+O desenho operacional aprovado em 2026-08-10 combina Google Apps Script e uma
+única tarefa semanal em nuvem:
 
-Agenda: a cada 30 minutos.
+```text
+Apps Script / Curador
+  -> Google Sheets / Evidências
+  -> tarefa cloud / Analista Editorial + geração do JSON
+  -> Google Sheets / Exports JSON com status Pronto
+  -> Apps Script / validação e Web App
+  -> plataforma
+  -> camada isolada de tradução, reações e famílias
+```
 
-Responsabilidade:
+A tarefa cloud ativa chama-se:
 
-- Criar ou encontrar a linha da semana anterior completa em `Controle Semanal`.
-- Acionar os especialistas em sequência, usando `next_step` como checkpoint.
-- Não fazer curadoria, análise ou exportação por conta própria.
-- Não reiniciar etapas marcadas como concluídas ou em andamento.
-- Só passar para a próxima etapa quando o especialista anterior declarar a saída
-  como concluída.
-- Produzir um resumo final quando a edição chegar a `concluido`,
-  `concluido_sem_export`, `revisar_exportador` ou `revisar_apps_script`.
+```text
+Voltinha — Análise editorial + JSON
+```
+
+Agenda configurada: segunda-feira às 12h30.
+
+Thread cloud:
+
+```text
+Prévia Trendices Semanal
+6a7a22e0-1884-83e9-8920-afe648a21664
+```
+
+Responsabilidade da tarefa cloud:
+
+- Calcular a semana anterior completa, de segunda a domingo.
+- Ler somente `Evidências`, sem acessar Gmail nem usar conhecimento externo.
+- Não criar uma edição quando já existir linha `Pronto` ou `Processado` para o
+  mesmo período.
+- Usar o export processado mais recente apenas como referência estrutural, sem
+  reutilizar conteúdo editorial.
+- Executar numa única rodada as etapas lógicas de Analista Editorial e geração
+  do JSON.
+- Gravar uma única linha `Pronto` em `Exports JSON` somente após validação
+  integral.
+- Atualizar a linha correspondente em `Controle Semanal` para
+  `aguardando_apps_script`.
+
+Estado de validação:
+
+- A automação está ativa, mas ainda não passou por uma execução semanal completa.
+- Acesso ao Google Sheets, fuso efetivo e qualidade editorial devem ser
+  confirmados nas duas primeiras execuções.
+- O acionador do Curador no projeto principal e o acionador de
+  `processTrendicesExports` ainda precisam ser conferidos.
+
+As automações locais anteriores permanecem pausadas:
+
+```text
+voltinha-do-trendices-disparo-semanal
+voltinha-do-trendices-coordenador-semanal
+```
+
+Elas não devem ser reativadas sem novo diagnóstico, debate e aprovação, pois
+representam a arquitetura antiga com Curador no Codex e acompanhamento horário.
 
 ### Curador de Evidências
 
@@ -247,6 +293,17 @@ Limites:
 - Não ler Gmail.
 - Não gerar JSON final.
 - Não enviar e-mail.
+
+#### Execução Semanal Em Nuvem
+
+Na operação atual, Analista Editorial e geração do JSON continuam sendo etapas
+lógicas distintas, mas são executadas na mesma tarefa cloud para reduzir custo,
+latência e coordenação. Isso não altera o contrato do JSON nem impede uma futura
+migração do Analista para Apps Script.
+
+A tarefa cloud deve tratar a planilha como fonte canônica, impedir duplicidade e
+interromper sem escrita parcial quando houver falta de acesso, evidências
+insuficientes ou falha de validação.
 
 ### Exportador/Validador
 
@@ -462,16 +519,24 @@ status = Processado
 
 ## Checklist Semanal
 
-1. Coordenador aciona Curador.
-2. Curador registra evidências.
-3. Coordenador verifica se o Curador declarou evidências analisáveis.
-4. Coordenador aciona Analista.
-5. Analista declara signals rastreáveis ou encerra sem export.
-6. Coordenador aciona Exportador.
-7. Exportador grava linha `Pronto`.
-8. Apps Script valida linha `Pronto` e disponibiliza o JSON.
-9. Plataforma é atualizada.
-10. Resultado visual é conferido no site.
+1. Apps Script executa o Curador e registra evidências.
+2. A tarefa cloud calcula a semana anterior completa.
+3. A tarefa cloud verifica se já existe export do período.
+4. O Analista cloud produz signals rastreáveis ou encerra sem export.
+5. A mesma tarefa valida o payload e grava uma única linha `Pronto`.
+6. Apps Script executa `processTrendicesExports` e marca `Processado` ou `Erro`.
+7. O Web App disponibiliza a edição para a plataforma.
+8. A camada isolada sincroniza e traduz as tendências citadas.
+9. O resultado visual e os estados da planilha são conferidos.
+10. Depois de a edição estar pronta, avaliar o envio de um push ao Terrário.
+
+O push ao Terrário é apenas um próximo passo para discussão. Antes de qualquer
+implementação, devem ser definidos destino, formato, conteúdo, autenticação,
+critério de sucesso e comportamento em caso de falha.
+
+Todos os próximos passos deste documento são temas para conversa. Nenhum deles
+autoriza programação, alteração de automação, planilha, Apps Script, publicação
+ou integração externa sem nova aprovação prévia, explícita e inequívoca.
 
 ## Aprendizados Do Primeiro Teste
 

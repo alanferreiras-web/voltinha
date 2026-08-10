@@ -27,6 +27,10 @@ automaticamente a implementacao. Nenhum codigo, planilha, Apps Script, JSON,
 automacao, arquitetura ou publicacao deve ser alterado sem debate e aprovacao
 inequivoca, inclusive em ajustes pequenos.
 
+Todos os proximos passos registrados neste documento existem somente para
+orientar conversas futuras. Eles nunca devem ser executados sem uma nova
+aprovacao previa, explicita e inequivoca do usuario.
+
 ## O Que E
 
 A Voltinha do Trendices e um sistema pessoal para transformar os e-mails e
@@ -51,12 +55,11 @@ plataforma.
 
 ```text
 Gmail
-  -> Curador de Evidencias
+  -> Curador de Evidencias no Apps Script
   -> Google Sheets / Evidencias
-  -> Analista Editorial
-  -> Exportador/Validador
+  -> tarefa cloud / Analista Editorial + geracao do JSON
   -> Google Sheets / Exports JSON
-  -> Apps Script Web App canonico
+  -> Apps Script / validacao + Web App canonico
   -> Plataforma
 
 Apps Script Web App canonico
@@ -68,6 +71,11 @@ Apps Script Web App canonico
 
 O Supabase ficou legado/opcional. A fonte principal da plataforma agora e a
 planilha, servida por um Web App do Apps Script.
+
+Analista Editorial e geracao do JSON continuam como responsabilidades logicas
+distintas, mas rodam numa unica tarefa cloud semanal para reduzir consumo e
+eliminar a dependencia do computador ligado. Essa decisao operacional nao muda
+o contrato do JSON e pode ser revista numa futura migracao para Apps Script.
 
 ## Base De Controle
 
@@ -151,29 +159,65 @@ Thread:
 
 ## Automacoes
 
-### Disparo Semanal
+### Analista Editorial + JSON Em Nuvem
 
-Roda toda segunda-feira as 9h.
+Nome:
+
+```text
+Voltinha — Análise editorial + JSON
+```
+
+Agenda configurada: segunda-feira as 12h30.
+
+Thread cloud:
+
+```text
+Previa Trendices Semanal
+6a7a22e0-1884-83e9-8920-afe648a21664
+```
 
 Funcao:
 
 - calcular a semana anterior completa;
-- criar a linha em `Controle Semanal`, se ainda nao existir;
-- acionar o Curador quando o proximo passo for `acionar_curador`;
-- garantir que o acompanhamento de edicao aberta esteja ativo.
+- verificar se o periodo ja possui export `Pronto` ou `Processado`;
+- ler somente as evidencias seguras do periodo;
+- executar a analise editorial sem Gmail, internet ou conhecimento externo;
+- montar e validar o JSON completo;
+- gravar uma unica linha `Pronto` em `Exports JSON`;
+- atualizar o checkpoint para `aguardando_apps_script`.
 
-### Acompanhamento De Edicao Aberta
+Estado:
 
-Roda de hora em hora apenas enquanto houver uma edicao aberta.
+- ativa;
+- independente do computador local;
+- ainda nao validada numa execucao semanal completa;
+- deve ser observada durante as duas primeiras rodadas.
 
-Funcao:
+### Automacoes Locais Legadas
 
-- ler a aba `Controle Semanal`;
-- verificar se algum agente concluiu sua etapa;
-- atualizar o proximo passo;
-- acionar Analista ou Exportador quando for o momento;
-- verificar se o Apps Script validou o export;
-- pausar a si mesmo quando nao houver edicao em andamento.
+Permanecem pausadas:
+
+```text
+voltinha-do-trendices-disparo-semanal
+voltinha-do-trendices-coordenador-semanal
+```
+
+Elas representam o desenho antigo, com Curador no Codex e acompanhamento
+horario. Nao devem ser reativadas sem novo diagnostico, conversa e aprovacao.
+
+### Acionadores Do Apps Script
+
+Confirmado:
+
+- sincronizacao e traducao da camada isolada de tendencias diariamente entre
+  11h e 12h, em `America/Sao_Paulo`.
+
+Ainda precisa ser conferido:
+
+- acionador de `executarPipelineCompleto` no projeto principal do Curador;
+- conta Google proprietaria desse acionador;
+- acionador e janela de `processTrendicesExports`;
+- horario ideal da traducao depois do primeiro ciclo cloud completo.
 
 ## Estados Da Semana
 
@@ -325,8 +369,8 @@ O projeto ja tem:
 - botao de like;
 - botao de atualizacao de teste;
 - Temperatura do Mes baseada em `macro_themes`;
-- automacao semanal;
-- acompanhamento horario condicional para edicoes abertas;
+- tarefa cloud semanal ativa para Analista Editorial + geracao do JSON;
+- automacoes locais antigas pausadas;
 - front editorial organizado em quatro capitulos;
 - camada isolada de termos citados;
 - traducoes de apoio sem substituicao do original;
@@ -357,4 +401,19 @@ Validacao de referencia da edicao 5:
 - Evitar que o front resolva problemas editoriais que deveriam vir do Analista.
 - Evitar que o Exportador invente conteudo quando a analise estiver incompleta.
 - Usar `macro_themes` com parcimonia para a Temperatura do Mes continuar limpa.
+
+## Proximos Passos Para Conversa
+
+Os itens abaixo nao autorizam execucao. Cada um exige diagnostico, debate e
+nova aprovacao explicita antes de qualquer mudanca.
+
+- Observar as duas primeiras execucoes da tarefa cloud e conferir qualidade,
+  duplicidade, fuso horario e acesso a planilha.
+- Confirmar os acionadores do Curador e de `processTrendicesExports` no Apps
+  Script principal.
+- Revisar o horario da traducao somente depois de um ciclo semanal completo.
+- Discutir um push para o Terrario quando a edicao semanal ficar pronta,
+  definindo destino, formato, conteudo, autenticacao e tratamento de falhas.
+- Avaliar a migracao futura do Analista Editorial e da geracao do JSON para Apps
+  Script apenas se a operacao cloud deixar de atender ao projeto.
 
