@@ -1,10 +1,23 @@
 # Voltinha do Trendices - Backlog
 
+## Regra De Entrada
+
+Itens neste backlog representam possibilidades, não autorização para executar.
+Antes de qualquer programação, cada item deve ser diagnosticado, debatido e
+aprovado explicitamente pelo usuário.
+
+## Próxima Versão Possível: v2.2
+
+- [ ] Avaliar proteção de escrita para o Web App de tendências citadas.
+- [ ] Avaliar refinamentos da experiência de famílias depois do uso real.
+- [ ] Observar a sincronização diária das 11h nas próximas edições.
+- [ ] Reunir feedback de uso antes de propor novos controles no scroll 3.
+
 ## Agora
 
 - [ ] Auditar semanas em que a Voltinha não funcionou corretamente, separando
       falhas por etapa: curadoria, análise, exportação, Apps Script ou front.
-- [ ] Migrar a plataforma para usar Google Sheets + Apps Script como fonte
+- [x] Migrar a plataforma para usar Google Sheets + Apps Script como fonte
       principal, reduzindo dependência de Supabase para projetos pessoais.
 - [ ] Ajustar o prompt do Analista para gerar `summary` mais curto e mais visual.
 - [ ] Preservar acentos e caracteres em português no texto final.

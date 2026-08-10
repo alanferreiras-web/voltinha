@@ -1,7 +1,20 @@
-# Projeto Futuro: Interações E Traduções De Tendências
+# Módulo Atual: Interações E Traduções De Tendências
 
-Status: implementação concluída e validada localmente no branch
-`codex/interacoes-traducao`; publicação do front ainda pendente.
+Versão: `v2.1.0`.
+
+Status: implementação concluída, publicada e validada em produção.
+
+Site:
+
+```text
+https://alanferreiras-web.github.io/voltinha/
+```
+
+Commit de referência:
+
+```text
+256d34e48097e770dc5efe5b3fdde057de519e39
+```
 
 Web App isolado:
 
@@ -18,7 +31,7 @@ Adicionar ao scroll 3 uma camada persistente de reações editoriais e traduçõ
 sem alterar nenhuma aba existente, o JSON canônico, o Apps Script atual ou os
 checkpoints do pipeline semanal.
 
-## Escopo Proposto
+## Escopo Incorporado
 
 - Usar a nova aba `Tendências Citadas`, criada sem alterar as abas existentes.
 - Preservar todas as abas atuais sem mudanças de colunas, validações ou conteúdo.
@@ -104,6 +117,17 @@ Funcionamento:
 4. O Web App começa público e poderá mudar para token sem migração de dados.
 5. O front usa o original como fallback quando a tradução não estiver pronta.
 
+## Governança
+
+Este módulo é parte estável da `v2.1.0`. Qualquer evolução deve primeiro ser
+discutida com o usuário. Antes de programar, o agente deve apresentar o estado
+atual, a proposta, seus impactos e alternativas, e esperar aprovação explícita.
+
+Discussões sobre autenticação, novas reações, agrupamento automático, mudanças
+na tradução ou alterações visuais não autorizam implementação por si só. Nenhum
+código, aba, campo, gatilho, endpoint ou deploy deve mudar sem debate e aprovação
+prévios.
+
 ## Estado Validado
 
 - Edição 5: 27 termos e 27 ocorrências, sem duplicatas.
@@ -113,3 +137,4 @@ Funcionamento:
 - O scroll 3 combina os dados canônicos com traduções, reações e famílias.
 - Em telas menores, selecionar um termo leva diretamente ao box de detalhes.
 - Se o Web App isolado falhar, o front mantém os termos canônicos como fallback.
+- O site publicado foi conferido sem erros de console após a integração.

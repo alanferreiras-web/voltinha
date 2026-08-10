@@ -1,5 +1,25 @@
 # Voltinha do Trendices
 
+## Regra De Governança Para Mudanças
+
+Nenhum próximo passo que envolva programação, alteração de arquivos, mudanças
+na planilha, Apps Script, JSON, arquitetura, automações ou publicação deve ser
+executado imediatamente.
+
+Antes de qualquer implementação, o agente deve:
+
+1. inspecionar o estado atual;
+2. apresentar o diagnóstico e a mudança proposta;
+3. explicar impacto, limites e riscos;
+4. conversar com o usuário sobre as alternativas;
+5. esperar uma aprovação prévia, explícita e inequívoca.
+
+Uma sugestão, uma pergunta exploratória ou a discussão de um próximo passo não
+constituem autorização para programar. A implementação só começa depois de o
+usuário aprovar claramente a proposta discutida. Essa regra também vale para
+ajustes considerados pequenos, correções, refatorações, novos campos, gatilhos,
+deploys e alterações de documentação que façam parte de uma mudança técnica.
+
 ## Objetivo
 
 Manter um pipeline semanal para transformar e-mails das labels `trendices` e

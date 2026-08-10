@@ -1,5 +1,32 @@
 # Voltinha do Trendices - Documento Mestre
 
+## Versao Atual
+
+```text
+Versao: v2.1.0
+Status: estavel e publicada
+Publicacao: 10 de agosto de 2026
+Site: https://alanferreiras-web.github.io/voltinha/
+Commit: 256d34e48097e770dc5efe5b3fdde057de519e39
+Proxima versao incremental: v2.2
+```
+
+`v2.1.0` e a referencia atual do produto. Ajustes pequenos e evolucoes
+compativeis entram em `v2.2`. O nome `v3.0` fica reservado para uma mudanca
+estrutural de arquitetura, dados, acesso ou fluxo editorial.
+
+## Governanca De Proximos Passos
+
+Qualquer proximo passo que envolva programacao deve ser conversado antes de ser
+executado. O agente deve inspecionar o estado atual, apresentar diagnostico,
+proposta, impactos e alternativas, e esperar aprovacao previa e explicita do
+usuario.
+
+Discutir uma ideia, pedir uma recomendacao ou escolher uma direcao nao autoriza
+automaticamente a implementacao. Nenhum codigo, planilha, Apps Script, JSON,
+automacao, arquitetura ou publicacao deve ser alterado sem debate e aprovacao
+inequivoca, inclusive em ajustes pequenos.
+
 ## O Que E
 
 A Voltinha do Trendices e um sistema pessoal para transformar os e-mails e
@@ -29,8 +56,14 @@ Gmail
   -> Analista Editorial
   -> Exportador/Validador
   -> Google Sheets / Exports JSON
-  -> Apps Script Web App
+  -> Apps Script Web App canonico
   -> Plataforma
+
+Apps Script Web App canonico
+  -> sincronizacao diaria da camada de tendencias
+  -> Google Sheets / Tendencias Citadas
+  -> Apps Script Web App isolado
+  -> enriquecimento opcional do scroll 3
 ```
 
 O Supabase ficou legado/opcional. A fonte principal da plataforma agora e a
@@ -57,6 +90,8 @@ Abas principais:
 - `Exports JSON`: payloads finais usados pela plataforma.
 - `Listas`: valores permitidos.
 - `Instrucoes`: guia da planilha.
+- `Tendencias Citadas`: camada isolada de traducoes, reacoes e familias usada
+  pelo scroll 3. Nao substitui nem altera as abas canonicas.
 
 ## Agentes
 
@@ -174,13 +209,37 @@ site/index.html
 
 A plataforma:
 
-- le o JSON publicado pelo Apps Script;
+- le o JSON publicado pelo Apps Script canonico;
 - exibe a edicao da semana;
 - permite navegar por edicoes anteriores;
-- mostra fontes, trechos, materiais e leitura Brasil;
-- tem botao `Gostei` para sinalizar assuntos de interesse;
-- tem botao `Atualizar teste` para recarregar dados publicados sem rodar o
-  pipeline.
+- organiza a edicao em quatro capitulos progressivos: curadoria, sinais,
+  tendencias citadas e leituras;
+- mostra ate oito sinais com suas evidencias e fontes rastreaveis;
+- apresenta os termos citados literalmente, sem confundi-los com sinais;
+- combina o scroll 3 com uma camada opcional de traducoes, reacoes e familias;
+- mantem o texto original e exibe a traducao como apoio no box lateral;
+- permite marcar um termo como `acompanhar` ou `nao_e_tendencia`;
+- permite relacionar termos manualmente em uma familia;
+- mantem o conteudo canonico visivel se a camada isolada estiver indisponivel;
+- reune newsletters e materiais com links para leitura na origem.
+
+### Camada Isolada De Tendencias Citadas
+
+Web App:
+
+```text
+https://script.google.com/macros/s/AKfycby2xfCe4Gupe1oFNE2dyiXoJo1Z_cgsdEC19wdNPGTyt_YjoHET53NV3O_wRBnFmsBDuA/exec
+```
+
+Funcionamento:
+
+- sincroniza diariamente entre 11h e 12h em `America/Sao_Paulo`;
+- le a edicao publicada pelo Web App canonico;
+- grava somente na aba `Tendencias Citadas`;
+- traduz apenas os trechos das ocorrencias, sem substituir o original;
+- persiste reacoes e familias manuais;
+- nao expoe sincronizacao nem traducao no endpoint publico;
+- comeca com acesso publico e podera receber autenticacao em uma versao futura.
 
 ## Temperatura Do Mes
 
@@ -252,7 +311,8 @@ main
 Ultimo marco publicado:
 
 ```text
-Update Voltinha Sheets app flow
+v2.1.0 - Add cited trend interactions and translations
+Commit 256d34e48097e770dc5efe5b3fdde057de519e39
 ```
 
 ## Situacao Atual
@@ -267,9 +327,29 @@ O projeto ja tem:
 - Temperatura do Mes baseada em `macro_themes`;
 - automacao semanal;
 - acompanhamento horario condicional para edicoes abertas;
+- front editorial organizado em quatro capitulos;
+- camada isolada de termos citados;
+- traducoes de apoio sem substituicao do original;
+- reacoes editoriais persistentes;
+- familias manuais de termos;
+- sincronizacao diaria da camada de tendencias;
+- fallback para os dados canonicos;
 - versao atual publicada no GitHub.
 
+Validacao de referencia da edicao 5:
+
+```text
+27 termos
+27 ocorrencias
+24 traducoes concluidas
+3 trechos sem necessidade de traducao
+0 traducoes pendentes
+```
+
 ## Cuidados A Partir Daqui
+
+- Conversar e obter aprovacao explicita antes de qualquer programacao ou
+  alteracao tecnica.
 
 - Nao voltar a depender do Supabase como caminho principal sem decisao explicita.
 - Nao deixar o heartbeat rodando a cada 30 minutos para sempre.
