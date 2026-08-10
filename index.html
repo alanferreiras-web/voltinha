@@ -233,11 +233,45 @@
     }
     .term-panel h2 { margin: 0; font-size: clamp(28px, 4vw, 48px); line-height: 1; letter-spacing: -.035em; }
     .term-panel-count { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .term-reactions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+    .reaction-button {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: transparent;
+      padding: 8px 12px;
+      color: var(--muted);
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .reaction-button[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--bg); }
+    .term-state { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--ink); }
     .term-occurrence { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
     .term-occurrence strong { display: block; }
     .term-occurrence-meta { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
     .term-occurrence p { margin: 14px 0; font-size: 13px; line-height: 1.5; }
+    .term-occurrence .term-translation { margin-top: -5px; color: var(--muted); font-size: 12px; }
     .term-occurrence a { font-size: 12px; }
+    .term-family { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
+    .term-family-label { display: block; color: var(--muted); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+    .term-family-name { display: block; margin-top: 5px; font-size: 14px; }
+    .related-terms { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .related-term { padding: 5px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 10px; }
+    .term-family-editor { margin-top: 16px; color: var(--muted); font-size: 11px; }
+    .term-family-editor summary { width: max-content; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
+    .family-controls { display: grid; gap: 8px; margin-top: 14px; }
+    .family-control-row { display: flex; gap: 8px; }
+    .family-control-row input, .family-control-row select {
+      min-width: 0;
+      flex: 1;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, .5);
+      padding: 9px 10px;
+      color: var(--ink);
+      font: inherit;
+    }
+    .family-action { border: 0; border-bottom: 1px solid currentColor; background: transparent; padding: 5px 0; cursor: pointer; white-space: nowrap; }
+    .term-action-status { min-height: 16px; margin-top: 10px; color: var(--muted); font-size: 10px; }
 
     .reading-island {
       overflow: hidden;
@@ -396,13 +430,16 @@
 
   <script>
     const API_BASE = "https://script.google.com/macros/s/AKfycbzEtcKNXviXzehRNxK2M31Jg_gSIyAR0_ReKLBn_CyQU1T05W0G2MQIQKXCyI9K0d4/exec";
+    const ANNOTATION_API_BASE = "https://script.google.com/macros/s/AKfycby2xfCe4Gupe1oFNE2dyiXoJo1Z_cgsdEC19wdNPGTyt_YjoHET53NV3O_wRBnFmsBDuA/exec";
 
     const state = {
       payload: null,
+      overlay: null,
       editions: [],
       currentEdition: null,
       readingMode: "newsletters",
-      selectedTerm: 0
+      selectedTerm: 0,
+      terms: []
     };
 
     const elements = {
@@ -497,6 +534,30 @@
       return data;
     }
 
+    async function requestAnnotations(params = {}) {
+      const url = new URL(ANNOTATION_API_BASE);
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, value);
+      });
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error(`A camada de tendências respondeu ${response.status}.`);
+      const data = await response.json();
+      if (data?.ok === false) throw new Error(data.error || "A camada de tendências não respondeu corretamente.");
+      return data;
+    }
+
+    async function writeAnnotation(action, values = {}) {
+      const response = await fetch(ANNOTATION_API_BASE, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action, ...values })
+      });
+      if (!response.ok) throw new Error(`Não foi possível salvar (${response.status}).`);
+      const data = await response.json();
+      if (data?.ok === false) throw new Error(data.error || "Não foi possível salvar.");
+      return data;
+    }
+
     function extractPayload(response) {
       if (response?.edition?.edition && Array.isArray(response.edition.signals)) return response.edition;
       if (response?.payload?.edition) return response.payload;
@@ -580,7 +641,26 @@
       }).join("");
     }
 
-    function groupTerms(items) {
+    function groupTerms(items, overlay) {
+      if (Array.isArray(overlay?.terms) && overlay.terms.length) {
+        return overlay.terms.map(term => ({
+          title: term.term_original,
+          term_key: term.term_key,
+          reaction_status: term.reaction_status || "sem_marcacao",
+          family_id: term.family_id || "",
+          family_name: term.family_name || "",
+          occurrences: (term.occurrences || []).map(item => ({
+            key: item.record_id,
+            source_name: item.source_name,
+            email_subject: item.email_subject,
+            source_date: item.source_date,
+            url: item.source_url,
+            excerpt: item.excerpt_original,
+            excerpt_pt: item.excerpt_pt,
+            translation_status: item.translation_status
+          }))
+        })).sort((a, b) => b.occurrences.length - a.occurrences.length || a.title.localeCompare(b.title, "pt-BR"));
+      }
       const groups = new Map();
       items.forEach(item => {
         const title = String(item.title || "").trim();
@@ -596,6 +676,39 @@
       return Array.from(groups.values()).sort((a, b) => b.occurrences.length - a.occurrences.length || a.title.localeCompare(b.title, "pt-BR"));
     }
 
+    function familyMarkup(group) {
+      if (!group.term_key) return "";
+      const families = Array.isArray(state.overlay?.families) ? state.overlay.families : [];
+      const related = group.family_id
+        ? state.terms.filter(term => term.family_id === group.family_id && term.term_key !== group.term_key)
+        : [];
+      const currentFamily = group.family_id ? `
+        <div class="term-family">
+          <span class="term-family-label">Termos relacionados</span>
+          <strong class="term-family-name">${escapeHTML(group.family_name)}</strong>
+          ${related.length ? `<div class="related-terms">${related.map(term => `<span class="related-term">${escapeHTML(term.title)}</span>`).join("")}</div>` : ""}
+        </div>` : "";
+      const availableFamilies = families.filter(family => family.family_id !== group.family_id);
+      return `${currentFamily}
+        <details class="term-family-editor">
+          <summary>${group.family_id ? "Editar relações" : "Relacionar termos"}</summary>
+          <div class="family-controls">
+            ${availableFamilies.length ? `<div class="family-control-row">
+              <select id="familySelect" aria-label="Família existente">
+                <option value="">Escolha uma família</option>
+                ${availableFamilies.map(family => `<option value="${escapeHTML(family.family_id)}">${escapeHTML(family.family_name)}</option>`).join("")}
+              </select>
+              <button class="family-action" type="button" data-family-action="assign">Adicionar</button>
+            </div>` : ""}
+            <div class="family-control-row">
+              <input id="newFamilyName" maxlength="120" placeholder="Nome da nova família" aria-label="Nome da nova família">
+              <button class="family-action" type="button" data-family-action="create">Criar</button>
+            </div>
+            ${group.family_id ? `<button class="family-action" type="button" data-family-action="remove">Remover desta família</button>` : ""}
+          </div>
+        </details>`;
+    }
+
     function renderTermPanel(group) {
       if (!group) {
         elements.termPanel.innerHTML = `<p class="empty-state">Nenhum termo registrado nesta edição.</p>`;
@@ -604,6 +717,10 @@
       elements.termPanel.innerHTML = `
         <h2>${escapeHTML(group.title)}</h2>
         <div class="term-panel-count">${group.occurrences.length} ${group.occurrences.length === 1 ? "fonte" : "fontes"}</div>
+        ${group.term_key ? `<div class="term-reactions" aria-label="Reação editorial">
+          <button class="reaction-button" type="button" data-reaction="acompanhar" aria-pressed="${group.reaction_status === "acompanhar"}">Acompanhar</button>
+          <button class="reaction-button" type="button" data-reaction="nao_e_tendencia" aria-pressed="${group.reaction_status === "nao_e_tendencia"}">Não é tendência</button>
+        </div>` : ""}
         ${group.occurrences.map(item => {
           const url = safeUrl(item.url);
           const date = formatDate(item.source_date, { day: "numeric", month: "short" }).replace(".", "");
@@ -611,16 +728,20 @@
             <strong>${escapeHTML(item.source_name || "Fonte não identificada")}</strong>
             <span class="term-occurrence-meta">${escapeHTML(item.email_subject || "")}${item.email_subject && date ? " · " : ""}${escapeHTML(date)}</span>
             ${item.excerpt ? `<p>“${escapeHTML(item.excerpt)}”</p>` : ""}
+            ${item.excerpt_pt ? `<p class="term-translation">${escapeHTML(item.excerpt_pt)}</p>` : ""}
             ${url ? `<a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">Abrir fonte ↗</a>` : ""}
           </div>`;
-        }).join("")}`;
+        }).join("")}
+        ${familyMarkup(group)}
+        <div class="term-action-status" id="termActionStatus" aria-live="polite"></div>`;
     }
 
-    function renderTerms(payload) {
-      const terms = groupTerms(payload.named_trends || []);
+    function renderTerms(payload, overlay = state.overlay, selectedKey = state.terms[state.selectedTerm]?.term_key) {
+      const terms = groupTerms(payload.named_trends || [], overlay);
       state.terms = terms;
-      state.selectedTerm = Math.min(state.selectedTerm, Math.max(terms.length - 1, 0));
-      elements.termsCount.textContent = `${(payload.named_trends || []).length} termos`;
+      const selectedIndex = selectedKey ? terms.findIndex(term => term.term_key === selectedKey) : -1;
+      state.selectedTerm = selectedIndex >= 0 ? selectedIndex : Math.min(state.selectedTerm, Math.max(terms.length - 1, 0));
+      elements.termsCount.textContent = `${terms.length} termos`;
       if (!terms.length) {
         elements.termGrid.innerHTML = "";
         renderTermPanel(null);
@@ -629,9 +750,28 @@
       elements.termGrid.innerHTML = terms.map((group, index) => `
         <button class="term-button" type="button" data-term-index="${index}" aria-pressed="${index === state.selectedTerm}">
           <span>${escapeHTML(group.title)}</span>
+          ${group.reaction_status && group.reaction_status !== "sem_marcacao" ? `<span class="term-state" title="${group.reaction_status === "acompanhar" ? "Acompanhar" : "Não é tendência"}"></span>` : ""}
           <span class="term-count">${group.occurrences.length}</span>
         </button>`).join("");
       renderTermPanel(terms[state.selectedTerm]);
+    }
+
+    function setTermPanelBusy(message) {
+      elements.termPanel.querySelectorAll("button, input, select").forEach(control => { control.disabled = true; });
+      const status = elements.termPanel.querySelector("#termActionStatus");
+      if (status) status.textContent = message;
+    }
+
+    function showTermPanelError(error) {
+      elements.termPanel.querySelectorAll("button, input, select").forEach(control => { control.disabled = false; });
+      const status = elements.termPanel.querySelector("#termActionStatus");
+      if (status) status.textContent = error?.message || "Não foi possível salvar.";
+    }
+
+    async function refreshAnnotations(selectedKey) {
+      const overlay = await requestAnnotations({ edition: state.currentEdition });
+      state.overlay = overlay;
+      renderTerms(state.payload, overlay, selectedKey);
     }
 
     function renderReading(payload) {
@@ -677,14 +817,16 @@
         : `<p class="empty-state">Nenhuma edição disponível.</p>`;
     }
 
-    function renderEdition(payload) {
+    function renderEdition(payload, overlay = null) {
       state.payload = payload;
+      state.overlay = overlay;
       state.currentEdition = payload.edition?.edition_number;
       state.readingMode = "newsletters";
       state.selectedTerm = 0;
+      state.terms = [];
       renderHero(payload);
       renderSignals(payload);
-      renderTerms(payload);
+      renderTerms(payload, overlay);
       renderReading(payload);
       renderArchive();
       elements.loading.hidden = true;
@@ -713,7 +855,11 @@
         const payload = extractPayload(response);
         if (!payload) throw new Error("A edição recebida não possui o formato esperado.");
         if (!state.editions.length && Array.isArray(response.available_editions)) state.editions = response.available_editions;
-        renderEdition(payload);
+        const overlay = await requestAnnotations({ edition: payload.edition?.edition_number }).catch(error => {
+          console.warn("Camada de tendências indisponível.", error);
+          return null;
+        });
+        renderEdition(payload, overlay);
         if (updateAddress) {
           const url = new URL(window.location.href);
           url.searchParams.set("edition", state.currentEdition);
@@ -737,7 +883,11 @@
         state.editions = Array.isArray(listResponse.editions) ? listResponse.editions : [];
         const payload = extractPayload(editionResponse);
         if (!payload) throw new Error("A edição recebida não possui o formato esperado.");
-        renderEdition(payload);
+        const overlay = await requestAnnotations({ edition: payload.edition?.edition_number }).catch(error => {
+          console.warn("Camada de tendências indisponível.", error);
+          return null;
+        });
+        renderEdition(payload, overlay);
       } catch (error) {
         console.error(error);
         showError(error);
@@ -766,6 +916,45 @@
         termButton.setAttribute("aria-pressed", String(termButton === button));
       });
       renderTermPanel(state.terms[state.selectedTerm]);
+      if (window.matchMedia("(max-width: 850px)").matches) {
+        elements.termPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+    elements.termPanel.addEventListener("click", async event => {
+      const group = state.terms[state.selectedTerm];
+      if (!group?.term_key) return;
+      const reactionButton = event.target.closest("[data-reaction]");
+      const familyButton = event.target.closest("[data-family-action]");
+      if (!reactionButton && !familyButton) return;
+      try {
+        if (reactionButton) {
+          const chosen = reactionButton.dataset.reaction;
+          const next = group.reaction_status === chosen ? "sem_marcacao" : chosen;
+          setTermPanelBusy("Salvando…");
+          await writeAnnotation("set_reaction", { term_key: group.term_key, reaction_status: next });
+          await refreshAnnotations(group.term_key);
+          return;
+        }
+        const action = familyButton.dataset.familyAction;
+        if (action === "create") {
+          const name = elements.termPanel.querySelector("#newFamilyName")?.value.trim();
+          if (!name) throw new Error("Dê um nome à família.");
+          setTermPanelBusy("Criando família…");
+          await writeAnnotation("create_family", { family_name: name, term_keys: [group.term_key] });
+        } else if (action === "assign") {
+          const familyId = elements.termPanel.querySelector("#familySelect")?.value;
+          if (!familyId) throw new Error("Escolha uma família.");
+          setTermPanelBusy("Salvando relação…");
+          await writeAnnotation("assign_family", { family_id: familyId, term_keys: [group.term_key] });
+        } else if (action === "remove") {
+          setTermPanelBusy("Removendo relação…");
+          await writeAnnotation("remove_from_family", { term_keys: [group.term_key] });
+        }
+        await refreshAnnotations(group.term_key);
+      } catch (error) {
+        console.error(error);
+        showTermPanelError(error);
+      }
     });
     elements.newslettersTab.addEventListener("click", () => {
       state.readingMode = "newsletters";
